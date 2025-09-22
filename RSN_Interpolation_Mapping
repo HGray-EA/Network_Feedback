@@ -1,0 +1,134 @@
+---
+title: "Feedback for RSN Options Scoping"
+format: html
+editor: visual
+---
+
+## Current
+
+```{r}
+#| echo: false
+#| warnings: false
+  
+
+# Trial of heatmap cropped to river network
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(akima)
+
+DRN <- read_sf("/dbfs/mnt/lab/unrestricted/harry.gray@environment-agency.gov.uk/DRN/DRN_Merged_MCAT.shp")
+RHS <- read_sf("/dbfs/mnt/lab/unrestricted/harry.gray@environment-agency.gov.uk/CEP/RHS_w_MCATs.shp")
+
+# extract coords into separate columns for with
+RHS_coords <- RHS %>%
+  mutate(
+    Longitude = st_coordinates(.)[,1],
+    Latitude  = st_coordinates(.)[,2]
+  )
+
+# interpolate HMS values onto a grid
+grid <- with(RHS_coords, interp(x = Longitude, y = Latitude, z = HMS, duplicate = "mean"))
+
+# convert to dataframe
+grid_df <- expand.grid(x = grid$x, y = grid$y)
+grid_df$HMS <- as.vector(grid$z)
+
+# plot
+ggplot(grid_df, aes(x = x, y = y, fill = HMS)) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  theme_minimal()
+
+```
+
+
+### Displaying the Detailed River Network
+:::{.column-page}
+Score Rivers only and not terrestrial land in between
+```{r}
+#| echo: false
+#| warnings: false
+
+
+# Add nearest DRN line id to RHS
+RHS$DRN_ID <- st_nearest_feature(RHS, DRN)
+
+# Join HMS values onto DRN
+DRN_HMS <- DRN %>%
+  mutate(DRN_ID = row_number()) %>%
+  left_join(RHS %>% st_drop_geometry() %>% 
+              group_by(DRN_ID) %>% 
+              summarise(HMS = mean(HMS, na.rm = TRUE)),
+            by = "DRN_ID")
+
+# Plot with RHS values ascribed to DRN.
+ggplot(DRN_HMS) +
+  geom_sf(aes(color = HMS), size = 2) +
+  scale_color_viridis_c(option = "plasma") +
+  labs(title="Reach RHS score for DRN without interpolation")+
+  theme_minimal()
+
+
+```
+:::
+
+
+```{r, leaflet map}
+#| echo: false
+#| eval: false
+
+
+
+pal <- colorNumeric("plasma", DRN_HMS$HMS)
+
+leaflet() %>%
+  addTiles() %>%
+  addPolylines(data = DRN_HMS,
+               color = ~pal(HMS),
+               weight = 2,
+               opacity = 1) %>%
+  addLegend("bottomright", pal = pal, values = DRN_HMS$HMS,
+            title = "HMS")
+
+
+```
+
+
+
+:::{.panel-tabset}
+```{r, interpolation}
+
+
+
+#### distance-weighted interpolation ###
+
+drn_coords <- st_coordinates(st_centroid(DRN))   # use line centroids
+rhs_coords <- st_coordinates(RHS)
+
+# HMS values
+rhs_vals <- RHS$HMS
+
+# Find k nearest RHS sites for each DRN segment
+k <- 5   # you can tune this
+nn <- FNN::get.knnx(rhs_coords, drn_coords, k)$nn.index
+dd <- FNN::get.knnx(rhs_coords, drn_coords, k)$nn.dist
+
+#  Compute inverse-distance weights
+w <- 1 / (dd + 1e-6)    # +1e-6 to avoid division by zero
+HMS_interp <- rowSums(rhs_vals[nn] * w) / rowSums(w)
+
+# Assign interpolated HMS values to DRN
+DRN_HMS <- DRN %>%
+  mutate(HMS = HMS_interp)
+
+ggplot(DRN_HMS) +
+  geom_sf(aes(color = HMS), size = 0.6) +
+  scale_color_viridis_c(option = "plasma") +
+    labs(title="Example interpolated HMS values for DRN")+
+  theme_minimal()
+
+
+```
+:::
+The above interpolates data, however, given the amount of datapoints RSN has, we are looking for a high level overview, so perhaps this is justified.
