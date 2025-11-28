@@ -71,6 +71,28 @@ ggplot(DRN_HMS) +
 
 
 ```
+
+```{r, leaflet map}
+#| echo: false
+#| eval: false
+# Add nearest DRN line id to RHS
+RHS$DRN_ID <- st_nearest_feature(RHS, DRN)
+
+# Join HMS values onto DRN
+DRN_HMS <- DRN %>%
+  mutate(DRN_ID = row_number()) %>%
+  left_join(RHS %>% st_drop_geometry() %>% 
+              group_by(DRN_ID) %>% 
+              summarise(HMS = mean(HMS, na.rm = TRUE)),
+            by = "DRN_ID")
+
+# Plot with RHS values ascribed to DRN.
+ggplot(DRN_HMS) +
+  geom_sf(aes(color = HMS), size = 2) +
+  scale_color_viridis_c(option = "plasma") +
+  labs(title="Reach RHS score for DRN without interpolation")+
+  theme_minimal()
+```
 :::
 
 ```{r, leaflet map}
