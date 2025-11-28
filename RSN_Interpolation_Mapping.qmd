@@ -42,14 +42,14 @@ ggplot(grid_df, aes(x = x, y = y, fill = HMS)) +
 
 ```
 
-
 ### Displaying the Detailed River Network
-:::{.column-page}
+
+::: column-page
 Score Rivers only and not terrestrial land in between
+
 ```{r}
 #| echo: false
 #| warnings: false
-
 
 # Add nearest DRN line id to RHS
 RHS$DRN_ID <- st_nearest_feature(RHS, DRN)
@@ -73,12 +73,9 @@ ggplot(DRN_HMS) +
 ```
 :::
 
-
 ```{r, leaflet map}
 #| echo: false
 #| eval: false
-
-
 
 pal <- colorNumeric("plasma", DRN_HMS$HMS)
 
@@ -94,12 +91,8 @@ leaflet() %>%
 
 ```
 
-
-
-:::{.panel-tabset}
+::: panel-tabset
 ```{r, interpolation}
-
-
 
 #### distance-weighted interpolation ###
 
@@ -128,7 +121,7 @@ ggplot(DRN_HMS) +
     labs(title="Example interpolated HMS values for DRN")+
   theme_minimal()
 
-
 ```
 :::
+
 The above interpolates data, however, given the amount of datapoints RSN has, we are looking for a high level overview, so perhaps this is justified.
